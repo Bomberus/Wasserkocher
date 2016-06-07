@@ -35,10 +35,10 @@ init:
 	;Simulation
 	mov water_current,#75 ;Wassermenge = 75 dl
 	mov water_min, #50 ;Wassermenge
-	clr heizstab ;Disable Heizstab
-	clr is_active
-	clr hupe
-	clr taster
+	;clr heizstab ;Disable Heizstab
+	;clr is_active
+	;clr hupe
+	;clr taster
 	mov hupe_count, #0
 	;-----------------------------------
 	;Test Values
@@ -184,7 +184,7 @@ sensortick:
 	clr tempsensor_clk
 	ret
 main:
-	jnb taster, disable
+	jb taster, disable
 	call auslesen;
 
 	;check temperature
