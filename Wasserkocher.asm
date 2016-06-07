@@ -13,7 +13,6 @@ ajmp init
 ;-----------------
 ; Hauptprogramm
 ;-----------------
-init:
 	;Aliases
 	temp_current equ R0
 	temp_max equ P2
@@ -24,17 +23,166 @@ init:
 	water_min equ R2
 	is_active equ P0.3
 	hupe_count equ R3
+	tempsensor_dq equ P0.4
+	tempsensor_clk equ P0.5
+	tempsensor_rst equ P0.6
+	tempsensor_com equ P3.2
+	tempsensor_low equ P3.3
+	tempsensor_high equ P3.4
 	;------------------------------------
+
+init:
 	;Simulation
-	mov temp_current,#20 ;Temperatur = 20
 	mov water_current,#75 ;Wassermenge = 75 dl
 	mov water_min, #50 ;Wassermenge
 	clr heizstab ;Disable Heizstab
 	clr is_active
+	clr hupe
+	clr taster
+	mov hupe_count, #0
 	;-----------------------------------
 	;Test Values
-	mov temp_max, #30
+	mov temp_max, #100
+	;Initialize the sensor
+	call resetsensor
+	call sensortick
 
+	call writemaxtemp
+	call writemintemp
+	call readtemp
+
+	jmp main
+
+writemaxtemp:
+	mov a, #01h ;Send the command to write the max temperature
+	call sendcommand
+	mov a, temp_max;Write temp max to the sensor (max 127°C and min -128°C)
+	call senddata
+	ret
+
+writemintemp:
+	mov a, #02h ;Send Minimal Temp
+	call sendcommand
+	mov a, #128
+	call senddata
+	ret
+
+readtemp:
+	mov a, #170 ; Read current temp
+	call sendcommand
+	call getdata
+	mov temp_current,a
+	clr a
+	ret
+
+;Send command in register a to sensor
+sendcommand:
+	call resetsensor
+	mov c, a.0
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.1
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.2
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.3
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.4
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.5
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.6
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.7
+	mov tempsensor_dq, c
+	call sensortick
+	clr a
+	clr c
+	ret
+;Send data in register a to (Sensor expects 9 bit)
+senddata:
+	clr tempsensor_dq
+	call sensortick
+	mov c, a.0
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.1
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.2
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.3
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.4
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.5
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.6
+	mov tempsensor_dq, c
+	call sensortick
+	mov c, a.7
+	mov tempsensor_dq, c
+	call sensortick
+	clr c
+	clr a
+	ret
+
+getdata:
+	clr a
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.0, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.1, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.2, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.3, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.4, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.5, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.6, c
+	setb tempsensor_clk
+	clr tempsensor_clk
+	mov c, tempsensor_dq
+	mov a.7, c
+	clr c
+	ret
+
+resetsensor:
+	clr tempsensor_rst
+	setb tempsensor_rst
+	ret
+
+sensortick:
+	setb tempsensor_clk
+	clr tempsensor_clk
+	ret
 main:
 	jnb taster, disable
 	call auslesen;
@@ -62,10 +210,11 @@ main:
 ; Lies derzeitige FÃ¼llmenge und Temperatur aus
 ;-----------------
 auslesen:
+	call readtemp
 	RET
 
 disable:
-	jnb is_active, main; Wenn der Wasserkocher von aktiv in deaktiv wechselt Hupe!
+	;jnb is_active, main; Wenn der Wasserkocher von aktiv in deaktiv wechselt Hupe!
 	clr heizstab ; deaktiviere Heizstab
 	clr is_active
 	mov hupe_count,#10
@@ -74,10 +223,6 @@ disable:
 
 erhitzen:
 	setb heizstab
-	mov A,temp_current
-	add A,#2 ;Add 2Â°C to the water temperature
-	mov temp_current,A
-	clr A
 	ret
 signal:
 	setb hupe ;aktiviere Hupe
