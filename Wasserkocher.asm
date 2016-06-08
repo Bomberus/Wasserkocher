@@ -35,22 +35,11 @@ init:
 	;Simulation
 	mov water_current,#75 ;Wassermenge = 75 dl
 	mov water_min, #50 ;Wassermenge
-	;clr heizstab ;Disable Heizstab
-	;clr is_active
-	;clr hupe
-	;clr taster
 	mov hupe_count, #0
-	;-----------------------------------
-	;Test Values
 	mov temp_max, #100
-	;Initialize the sensor
-	call resetsensor
-	call sensortick
-
-	call writemaxtemp
-	call writemintemp
-	call readtemp
-
+	clr heizstab ;Disable Heizstab
+	clr is_active
+	clr hupe
 	jmp main
 
 writemaxtemp:
@@ -183,16 +172,26 @@ sensortick:
 	setb tempsensor_clk
 	clr tempsensor_clk
 	ret
+
+inits:
+	clr heizstab ;Disable Heizstab
+	clr is_active
+	clr hupe
+	;Initialize the sensor
+	call resetsensor
+	call sensortick
+	call writemaxtemp
+	call writemintemp
+	setb is_active
+	jmp main
+
 main:
 	jb taster, disable
-	call auslesen;
+	jnb is_active, inits
+	call auslesen
 
 	;check temperature
-	mov A, temp_current
-	clr cy ;Reset the Carry
-	subb A, temp_max ;(aktuelle - gewuenschte Temp) cy=1, wenn aktuell < gewÃ¼nscht
-	clr A
-	jnb cy, disable
+	jb tempsensor_high, disable
 
 	;check water
 	mov A, water_min
@@ -202,7 +201,6 @@ main:
 	jnb cy,disable
 	clr cy
 
-	setb is_active
 	call erhitzen
 	call zeigen
 	jmp main
@@ -214,11 +212,12 @@ auslesen:
 	RET
 
 disable:
-	;jnb is_active, main; Wenn der Wasserkocher von aktiv in deaktiv wechselt Hupe!
 	clr heizstab ; deaktiviere Heizstab
 	clr is_active
+	jb taster,main
 	mov hupe_count,#10
 	call signal
+	;clr taster Mechanisch !!!!
 	jmp main
 
 erhitzen:
